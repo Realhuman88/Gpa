@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Weighted GPA Calculator</title>
+<style>
+  body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: #f0f4f8;
+    margin: 0; padding: 20px;
+    color: #333;
+  }
+  h1 {
+    text-align: center;
+    color: #2c3e50;
+  }
+  .container {
+    max-width: 900px;
+    margin: 20px auto;
+    background: #fff;
+    padding: 20px 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgb(0 0 0 / 0.1);
+  }
+  button {
+    background: #2980b9;
+    border: none;
+    color: white;
+    padding: 8px 14px;
+    font-size: 1rem;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background 0.3s ease;
+  }
+  button:hover {
+    background: #1f6391;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 8px 10px;
+    text-align: center;
+  }
+  th {
+    background-color: #3498db;
+    color: white;
+  }
+  input[type="number"], select {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+  .semester-section {
+    margin-top: 25px;
+    border: 1px solid #ddd;
+    padding: 15px 15px 10px;
+    border-radius: 6px;
+    background: #fafafa;
+  }
+  .semester-header {
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: #2c3e50;
+    margin-bottom: 12px;
+  }
+  .flex-row {
+    display: flex;
+    gap: 12px;
+  }
+  .flex-row > div {
+    flex: 1;
+  }
+  .remove-class-btn {
+    background: #e74c3c;
+    margin-left: 8px;
+  }
+  .remove-class-btn:hover {
+    background: #b83529;
+  }
+  .footer {
+    text-align: center;
+    font-size: 0.9rem;
+    color: #666;
+    margin-top: 40px;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <h1>Weighted GPA Calculator</h1>
+    <div id="semesters-container"></div>
+    <button id="add-semester-btn">Add Semester</button>
+    <button id="calculate-btn">Calculate GPAs</button>
+
+    <table id="results-table" style="display:none; margin-top: 30px;">
+      <thead>
+        <tr>
+          <th>Semester</th>
+          <th>Credits This Semester</th>
+          <th>Quality Points This Semester</th>
+          <th>Semester GPA</th>
+          <th>Cumulative Credits</th>
+          <th>Cumulative Quality Points</th>
+          <th>Cumulative GPA</th>
+        </tr>
+      </thead>
+      <tbody id="results-body"></tbody>
+    </table>
+  </div>
+
+<script>
+  // Utility: Convert letter grade to GPA (default scale)
+  function letterToGPA(letter) {
+    const scale = {A:4, B:3, C:2, D:1, F:0};
+    return scale[letter.toUpperCase()] ?? 0;
+  }
+
+  // Create a semester block with default one class
+  function createSemesterBlock(index) {
+    const semesterDiv = document.createElement("div");
+    semesterDiv.className = "semester-section";
+    semesterDiv.dataset.semesterIndex = index;
+
+    semesterDiv.innerHTML = `
+      <div class="semester-header">Semester ${index + 1}</div>
+      <div id="classes-container-${index}">
+        ${createClassRow(index, 0).outerHTML}
+      </div>
+      <button type="button" class="add-class-btn" data-semester="${index}">+ Add Class</button>
+    `;
+    return semesterDiv;
+  }
+
+  // Create one class input row
+  function createClassRow(semIndex, classIndex) {
+    const div = document.createElement("div");
+    div.className = "flex-row";
+    div.dataset.classIndex = classIndex;
+    div.style.marginBottom = "8px";
+
+    div.innerHTML = `
+      <div>
+        <input type="number" min="0" step="0.1" placeholder="Credits" class="credit-input" value="1" required />
+      </div>
+      <div>
+        <input type="number" min="0" max="5" step="0.01" placeholder="Weighted Grade (e.g. 4.5)" class="weight-input" value="4.0" required />
+      </div>
+      <div>
+        <select class="grade-select" required>
+          <option value="A" selected>A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="D">D</option>
+          <option value="F">F</option>
+        </select>
+      </div>
+      <button type="button" class="remove-class-btn" title="Remove Class">×</button>
+    `;
+    return div;
+  }
+
+  const semestersContainer = document.getElementById("semesters-container");
+  const addSemesterBtn = document.getElementById("add-semester-btn");
+  const calculateBtn = document.getElementById("calculate-btn");
+  const resultsTable = document.getElementById("results-table");
+  const resultsBody = document.getElementById("results-body");
+
+  // Add new semester block
+  function addSemester() {
+    const index = semestersContainer.children.length;
+    const semesterBlock = createSemesterBlock(index);
+    semestersContainer.appendChild(semesterBlock);
+  }
+
+  // Add new class row inside a semester
+  function addClass(semIndex) {
+    const classesContainer = document.getElementById(`classes-container-${semIndex}`);
+    const classCount = classesContainer.children.length;
+    const newClassRow = createClassRow(semIndex, classCount);
+    classesContainer.appendChild(newClassRow);
+  }
+
+  // Remove a class row
+  semestersContainer.addEventListener("click", (e) => {
+    if (e.target.classList.contains("add-class-btn")) {
+      const semIndex = e.target.dataset.semester;
+      addClass(semIndex);
+    }
+    if (e.target.classList.contains("remove-class-btn")) {
+      e.target.parentElement.remove();
+    }
+  });
+
+  // Calculate GPA results
+  calculateBtn.addEventListener("click", () => {
+    resultsBody.innerHTML = "";
+    let cumulativeCredits = 0;
+    let cumulativeQualityPoints = 0;
+
+    for (let i = 0; i < semestersContainer.children.length; i++) {
+      const semesterBlock = semestersContainer.children[i];
+      const classesContainer = semesterBlock.querySelector(`#classes-container-${i}`);
+      const classRows = classesContainer.children;
+
+      let semCredits = 0;
+      let semQualityPoints = 0;
+
+      for (const classRow of classRows) {
+        const credit = parseFloat(classRow.querySelector(".credit-input").value);
+        const weightedGrade = parseFloat(classRow.querySelector(".weight-input").value);
+        const gradeLetter = classRow.querySelector(".grade-select").value;
+
+        // Use weightedGrade if provided, else convert letter to GPA and multiply by weighting if needed
+        // Here we trust weightedGrade input, but you can extend for letter only
+        const gradeValue = weightedGrade;
+
+        if (isNaN(credit) || isNaN(gradeValue) || credit <= 0 || gradeValue < 0) {
+          alert("Please enter valid credit and weighted grade values.");
+          return;
+        }
+
+        semCredits += credit;
+        semQualityPoints += credit * gradeValue;
+      }
+
+      cumulativeCredits += semCredits;
+      cumulativeQualityPoints += semQualityPoints;
+
+      const semGPA = semQualityPoints / semCredits || 0;
+      const cumGPA = cumulativeQualityPoints / cumulativeCredits || 0;
+
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>Semester ${i + 1}</td>
+        <td>${semCredits.toFixed(2)}</td>
+        <td>${semQualityPoints.toFixed(2)}</td>
+        <td>${semGPA.toFixed(3)}</td>
+        <td>${cumulativeCredits.toFixed(2)}</td>
+        <td>${cumulativeQualityPoints.toFixed(2)}</td>
+        <td>${cumGPA.toFixed(3)}</td>
+      `;
+      resultsBody.appendChild(row);
+    }
+
+    if (semestersContainer.children.length > 0) {
+      resultsTable.style.display = "table";
+    } else {
+      resultsTable.style.display = "none";
+    }
+  });
+
+  // Initialize with 2 semesters by default
+  addSemester();
+  addSemester();
+</script>
+</body>
+</html>
